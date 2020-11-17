@@ -1,8 +1,0 @@
-language: java
-jdk:
-  - oraclejdk8
-
-# the below keeps 'gradle assemble' from being called which tries to sign the jars.
-install: 
-   - ./gradlew clean -xtest install
-
