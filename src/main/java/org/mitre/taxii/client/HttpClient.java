@@ -64,6 +64,8 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.mitre.taxii.Versions;
 import org.mitre.taxii.messages.TaxiiXml;
+import org.mitre.taxii.messages.xml11.StatusMessage;
+import org.mitre.taxii.messages.xml11.StatusTypeEnum;
 
 /**
  * <p>
@@ -389,7 +391,7 @@ public class HttpClient {
         }
 
         // we now have a TaxiiXml that knows how to handle the message we receieved.
-        Object resultObj = null;
+        StatusMessage resultObj = null;
 
         // Make the call to the server.
         try {
@@ -449,31 +451,32 @@ public class HttpClient {
                     }
                 }
 
-                if (!contentFound) { // Response is not a TAXII Message we understand.
-                    // go create a TAXII status message based on the headers.
-                    resultObj = taxiiXml.getResponseHandler().buildStatusCodeStatusMessage(response, message);
-                } else { // We should know how to handle the response.
-                    // Extract the response body.
-                    HttpEntity respEntity = response.getEntity();
-                    if(respEntity != null){
-                        try {
-                            InputStream input = respEntity.getContent();
-                            dumpContentBlocks(input, dir, blockSize);
-                        } catch (IOException | IllegalStateException e) {
-                            throw new JAXBException("Unable to establish an InputStream with TAXII server.");
+                resultObj = (StatusMessage) taxiiXml.getResponseHandler().buildStatusCodeStatusMessage(response, message);
+                
+                if(!StatusTypeEnum.FAILURE.equals(resultObj.getStatusType())) {
+                    if (contentFound) { // We should know how to handle the response.
+                        // Extract the response body.
+                        HttpEntity respEntity = response.getEntity();
+                        if(respEntity != null){
+                            try {
+                                InputStream input = respEntity.getContent();
+                                dumpContentBlocks(input, dir, blockSize);
+                            } catch (IOException | IllegalStateException e) {
+                                throw new JAXBException("Unable to establish an InputStream with TAXII server.");
+                            }
                         }
+                            
+                        // Attempt to parse the response into a JAXB object regardless of the 
+                        // HTTP status code.
                     }
-                        
-                    // Attempt to parse the response into a JAXB object regardless of the 
-                    // HTTP status code.
                 }
             } catch (SSLException ex) {
-                resultObj = taxiiXml.getResponseHandler().buildSSLErrorStatusMessage(ex, message);
+                resultObj = (StatusMessage)taxiiXml.getResponseHandler().buildSSLErrorStatusMessage(ex, message);
             }
         } finally {
             httpClient.close();
         }
-        //return resultObj;
+
         return resultObj;
     }
        
